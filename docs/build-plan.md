@@ -13,6 +13,7 @@ This file tracks progress, blockers, and next actions. Update **before and after
 - [x] Persist raw import payload + normalized tables + parser logs
 - [x] Build import UX: upload -> parse preview -> commit
 - [x] Build DB-backed dashboard (`/`) + `/stocks/[symbol]` detail (coverage + trends)
+- [ ] Normalize META/PRICE/DERIVED fields (price, mcap, shares) and improve dashboard health
 
 ## Phase 2 — Metrics + Scoring + Missing Data Intelligence
 
