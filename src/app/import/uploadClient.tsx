@@ -12,6 +12,14 @@ type ImportPreview = {
   parserVersion: string;
   importChecksum: string;
   warnings: Array<{ code: string; message: string }>;
+  meta?: {
+    companyName: string | null;
+    currentPrice: string | null;
+    marketCap: string | null;
+    faceValue: string | null;
+    shares: string | null;
+    sharesAdjCr: string | null;
+  };
   workbookMeta: { sheetNames: string[]; dataSheetName: "Data Sheet" };
   sectionKeys: string[];
   counts: {
@@ -151,6 +159,18 @@ export default function UploadClient() {
             <div className="text-zinc-800 dark:text-zinc-200">
               {preview.workbookMeta.sheetNames.join(", ")}
             </div>
+            <div className="text-zinc-500">Company name</div>
+            <div className="text-zinc-800 dark:text-zinc-200">
+              {preview.meta?.companyName ?? "—"}
+            </div>
+            <div className="text-zinc-500">Current price</div>
+            <div className="text-zinc-800 dark:text-zinc-200">
+              {preview.meta?.currentPrice ?? "—"}
+            </div>
+            <div className="text-zinc-500">Market cap</div>
+            <div className="text-zinc-800 dark:text-zinc-200">
+              {preview.meta?.marketCap ?? "—"}
+            </div>
             <div className="text-zinc-500">Sections</div>
             <div className="text-zinc-800 dark:text-zinc-200">
               {preview.sectionKeys.join(", ") || "(none)"}
@@ -217,4 +237,3 @@ export default function UploadClient() {
     </div>
   );
 }
-

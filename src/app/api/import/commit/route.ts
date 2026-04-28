@@ -4,7 +4,10 @@ import {
   asScreenerImportError,
   ScreenerImportError,
 } from "@/lib/importer/errors";
-import { normalizeParsedSections } from "@/lib/importer/normalize";
+import {
+  extractImportMetaSnapshot,
+  normalizeParsedSections,
+} from "@/lib/importer/normalize";
 import { ensureCompany, persistImport } from "@/lib/importer/persist";
 import { parseScreenerDataSheetXlsx } from "@/lib/importer/screenerDataSheetParser";
 
@@ -68,6 +71,7 @@ export async function POST(request: Request) {
     const buffer = await file.arrayBuffer();
     const parsed = parseScreenerDataSheetXlsx(buffer);
     const normalized = normalizeParsedSections(parsed.parsedSections);
+    const meta = extractImportMetaSnapshot(parsed.parsedSections);
 
     const company = await ensureCompany({ symbol: effectiveSymbol });
     const { importId } = await persistImport({
@@ -75,6 +79,7 @@ export async function POST(request: Request) {
       originalFileName: file.name,
       parsed,
       normalized,
+      meta,
     });
 
     return NextResponse.json({ ok: true, importId });
@@ -86,4 +91,3 @@ export async function POST(request: Request) {
     );
   }
 }
-

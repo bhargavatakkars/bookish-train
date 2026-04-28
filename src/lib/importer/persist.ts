@@ -7,6 +7,7 @@ import {
   balanceSheetItems,
   cashFlowItems,
   companies,
+  importAnnualPrices,
   importRawPayloads,
   imports,
   parserLogs,
@@ -22,6 +23,7 @@ import type {
   NormalizedStatementItem,
   NormalizedStatements,
 } from "./normalize";
+import type { ImportMetaSnapshot } from "./normalize";
 
 type DbTransaction = Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
 
@@ -84,6 +86,7 @@ export async function persistImport(params: {
   originalFileName?: string;
   parsed: ParsedDataSheet;
   normalized: NormalizedStatements;
+  meta: ImportMetaSnapshot;
 }): Promise<{ importId: string }>
 {
   const db = getDb();
@@ -95,9 +98,22 @@ export async function persistImport(params: {
         parserVersion: SCREENER_PARSER_VERSION,
         importChecksum: params.parsed.importChecksum,
         originalFileName: params.originalFileName ?? null,
+        currentPrice: params.meta.currentPrice,
+        marketCap: params.meta.marketCap,
       })
       .returning({ id: imports.id });
     const importId = insertedImport[0]!.id;
+
+    await tx
+      .update(companies)
+      .set({
+        name: params.meta.companyName,
+        faceValue: params.meta.faceValue,
+        shares: params.meta.shares,
+        sharesAdjCr: params.meta.sharesAdjCr,
+        updatedAt: new Date(),
+      })
+      .where(eq(companies.id, params.companyId));
 
     await tx.insert(importRawPayloads).values({
       importId,
@@ -106,6 +122,16 @@ export async function persistImport(params: {
       parsedSections: params.parsed.parsedSections,
       warnings: params.parsed.warnings,
     });
+
+    if (params.meta.annualPrices.length > 0) {
+      await tx.insert(importAnnualPrices).values(
+        params.meta.annualPrices.map((p) => ({
+          importId,
+          year: p.year,
+          price: p.price,
+        })),
+      );
+    }
 
     if (params.parsed.warnings.length > 0) {
       await tx.insert(parserLogs).values(

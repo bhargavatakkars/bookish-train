@@ -7,6 +7,7 @@ import {
   balanceSheetItems,
   cashFlowItems,
   companies,
+  importAnnualPrices,
   importRawPayloads,
   imports,
   parserLogs,
@@ -57,6 +58,8 @@ export async function getStockHeaderBySymbol(
       name: companies.name,
       latestImportAt: latestImports.importedAt,
       latestImportId: latestImports.id,
+      currentPrice: imports.currentPrice,
+      marketCap: imports.marketCap,
       warningCount: sql<number>`coalesce(${latestWarnings.warningCount}, 0)`.as(
         "warning_count",
       ),
@@ -67,6 +70,7 @@ export async function getStockHeaderBySymbol(
       latestImports,
       sql`${latestImports.companyId} = ${companies.id} and ${latestImports.rn} = 1`,
     )
+    .leftJoin(imports, eq(imports.id, latestImports.id))
     .leftJoin(latestWarnings, eq(latestWarnings.importId, latestImports.id))
     .leftJoin(importRawPayloads, eq(importRawPayloads.importId, latestImports.id))
     .where(eq(companies.symbol, normalizedSymbol))
@@ -87,7 +91,20 @@ export async function getStockHeaderBySymbol(
     latestImportId: row.latestImportId,
     warningCount: row.warningCount,
     sectionsAvailable,
+    currentPrice: row.currentPrice,
+    marketCap: row.marketCap,
   };
+}
+
+export async function getAnnualPriceSeries(importId: string): Promise<MetricPoint[]> {
+  const db = getDb();
+  const rows = await db
+    .select({ year: importAnnualPrices.year, price: importAnnualPrices.price })
+    .from(importAnnualPrices)
+    .where(eq(importAnnualPrices.importId, importId))
+    .orderBy(importAnnualPrices.year);
+
+  return rows.map((r) => ({ date: r.year, value: toNumberOrNull(r.price) }));
 }
 
 export async function getParserWarnings(importId: string): Promise<string[]> {
@@ -109,20 +126,34 @@ async function getMetricSeries(params: {
   frequency?: "annual" | "quarterly";
 }): Promise<MetricPoint[]> {
   const db = getDb();
-  const where = [eq(params.table.companyId, params.companyId), eq(params.table.metricKey, params.metricKey)];
-  if (params.table === profitLossItems && params.frequency) {
-    where.push(eq(profitLossItems.frequency, params.frequency));
-  }
-
-  const rows = await db
+  const baseSelect = db
     .select({
       statementDate: params.table.statementDate,
       value: params.table.value,
     })
     .from(params.table)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .where(and(...(where as any)))
     .orderBy(params.table.statementDate);
+
+  const rows =
+    params.table === profitLossItems
+      ? await baseSelect.where(
+          params.frequency
+            ? and(
+                eq(profitLossItems.companyId, params.companyId),
+                eq(profitLossItems.metricKey, params.metricKey),
+                eq(profitLossItems.frequency, params.frequency),
+              )
+            : and(
+                eq(profitLossItems.companyId, params.companyId),
+                eq(profitLossItems.metricKey, params.metricKey),
+              ),
+        )
+      : await baseSelect.where(
+          and(
+            eq(params.table.companyId, params.companyId),
+            eq(params.table.metricKey, params.metricKey),
+          ),
+        );
 
   return rows.map((r) => ({ date: r.statementDate, value: toNumberOrNull(r.value) }));
 }
@@ -174,4 +205,3 @@ export async function getStockTimeSeries(
     patAndCfo,
   };
 }
-

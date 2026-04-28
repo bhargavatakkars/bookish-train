@@ -20,6 +20,9 @@ export const companies = pgTable("companies", {
   symbol: text("symbol").notNull(),
   name: text("name"),
   exchange: text("exchange"),
+  faceValue: text("face_value"),
+  shares: text("shares"),
+  sharesAdjCr: text("shares_adj_cr"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -33,7 +36,24 @@ export const imports = pgTable("imports", {
   parserVersion: text("parser_version").notNull(),
   importChecksum: text("import_checksum").notNull(),
   originalFileName: text("original_file_name"),
+  currentPrice: text("current_price"),
+  marketCap: text("market_cap"),
 });
+
+export const importAnnualPrices = pgTable(
+  "import_annual_prices",
+  {
+    importId: uuid("import_id")
+      .notNull()
+      .references(() => imports.id, { onDelete: "cascade" }),
+    year: text("year").notNull(),
+    price: text("price"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.importId, t.year] }),
+  }),
+);
 
 export const importRawPayloads = pgTable("import_raw_payloads", {
   id: uuid("id").defaultRandom().primaryKey(),

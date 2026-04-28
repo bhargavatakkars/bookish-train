@@ -16,6 +16,16 @@ export type NormalizedStatements = {
   cashFlow: NormalizedStatementItem[];
 };
 
+export type ImportMetaSnapshot = {
+  companyName: string | null;
+  currentPrice: string | null;
+  marketCap: string | null;
+  faceValue: string | null;
+  shares: string | null;
+  sharesAdjCr: string | null;
+  annualPrices: Array<{ year: string; price: string | null }>;
+};
+
 function toMetricKey(label: string): string {
   return label
     .trim()
@@ -79,3 +89,70 @@ export function normalizeParsedSections(
   };
 }
 
+function normalizeLabel(label: string): string {
+  return label.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function firstValueAsString(row: { values: unknown[] }): string | null {
+  const value = row.values.find((v) => v !== null && v !== undefined);
+  if (value === null || value === undefined) return null;
+  const str = String(value).trim();
+  return str.length === 0 ? null : str;
+}
+
+export function extractImportMetaSnapshot(
+  sections: ScreenerParsedSections,
+): ImportMetaSnapshot {
+  const metaRows = sections.META?.rows ?? [];
+  const derivedRows = sections.DERIVED?.rows ?? [];
+  const priceRows = sections.PRICE?.rows ?? [];
+
+  const rowMap = new Map<string, { values: unknown[] }>();
+  for (const row of [...metaRows, ...derivedRows]) {
+    rowMap.set(normalizeLabel(row.label), { values: row.values });
+  }
+
+  const companyName =
+    firstValueAsString(
+      rowMap.get("company name") ?? { values: [] },
+    ) ?? null;
+  const currentPrice =
+    firstValueAsString(rowMap.get("current price") ?? { values: [] }) ?? null;
+  const marketCap =
+    firstValueAsString(rowMap.get("market cap") ?? { values: [] }) ?? null;
+  const faceValue =
+    firstValueAsString(rowMap.get("face value") ?? { values: [] }) ?? null;
+  const shares =
+    firstValueAsString(rowMap.get("number of shares") ?? { values: [] }) ?? null;
+  const sharesAdjCr =
+    firstValueAsString(
+      rowMap.get("adjusted equity shares in cr") ?? { values: [] },
+    ) ?? null;
+
+  const annualPrices: Array<{ year: string; price: string | null }> = [];
+  if (sections.PRICE) {
+    const years = sections.PRICE.periodHeaders;
+    const annualRow = priceRows.find(
+      (r) => normalizeLabel(r.label) === "annual price",
+    );
+
+    if (annualRow) {
+      for (let i = 0; i < years.length; i++) {
+        annualPrices.push({
+          year: years[i]!,
+          price: valueToString(annualRow.values[i]),
+        });
+      }
+    }
+  }
+
+  return {
+    companyName,
+    currentPrice,
+    marketCap,
+    faceValue,
+    shares,
+    sharesAdjCr,
+    annualPrices,
+  };
+}

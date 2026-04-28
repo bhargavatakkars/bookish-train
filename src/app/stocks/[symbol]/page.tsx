@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { SummaryCard } from "@/components/SummaryCard";
 import { StockTrendChart } from "@/components/StockTrendChart";
 import {
+  getAnnualPriceSeries,
   getParserWarnings,
   getStockHeaderBySymbol,
   getStockTimeSeries,
@@ -12,6 +13,10 @@ import {
 function formatValue(value: number | null): string {
   if (value === null) return "Not available from import";
   return value.toLocaleString("en-IN");
+}
+
+function formatTextValue(value: string | null): string {
+  return value ?? "Not available from import";
 }
 
 function lastNonNull(series: Array<{ value: number | null }>): number | null {
@@ -29,9 +34,10 @@ export default async function StockPage(props: {
   const header = await getStockHeaderBySymbol(symbol);
   if (!header) notFound();
 
-  const [warnings, series] = await Promise.all([
+  const [warnings, series, annualPrices] = await Promise.all([
     header.latestImportId ? getParserWarnings(header.latestImportId) : [],
     getStockTimeSeries(header.companyId),
+    header.latestImportId ? getAnnualPriceSeries(header.latestImportId) : [],
   ]);
 
   const latestSales = lastNonNull(series.sales);
@@ -81,8 +87,8 @@ export default async function StockPage(props: {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <SummaryCard title="Current Price" value="Not available from import" />
-        <SummaryCard title="Market Cap" value="Not available from import" />
+        <SummaryCard title="Current Price" value={formatTextValue(header.currentPrice)} />
+        <SummaryCard title="Market Cap" value={formatTextValue(header.marketCap)} />
         <SummaryCard title="Latest Sales" value={formatValue(latestSales)} />
         <SummaryCard title="Latest Net Profit" value={formatValue(latestNetProfit)} />
         <SummaryCard title="Latest Borrowings" value={formatValue(latestBorrowings)} />
@@ -143,6 +149,11 @@ export default async function StockPage(props: {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <StockTrendChart
+          title="Annual price trend"
+          data={annualPrices.map((p) => ({ date: p.date, value: p.value }))}
+          lines={[{ key: "value", name: "Price", stroke: "#2563eb" }]}
+        />
+        <StockTrendChart
           title="Sales trend"
           data={series.sales.map((p) => ({ date: p.date, value: p.value }))}
           lines={[{ key: "value", name: "Sales", stroke: "#0f766e" }]}
@@ -201,4 +212,3 @@ export default async function StockPage(props: {
     </div>
   );
 }
-

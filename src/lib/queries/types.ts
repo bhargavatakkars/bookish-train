@@ -2,9 +2,27 @@ export type DashboardStockRow = {
   companyId: string;
   symbol: string;
   name: string | null;
+  currentPrice: string | null;
+  marketCap: string | null;
   latestImportAt: Date | null;
   latestImportId: string | null;
   warningCount: number;
+};
+
+export type RecentImportRow = {
+  importId: string;
+  companyId: string;
+  symbol: string;
+  name: string | null;
+  importedAt: Date;
+  warningCount: number;
+};
+
+export type SystemHealthSummary = {
+  totalImports: number;
+  importsWithWarnings: number;
+  warningsLast7d: number;
+  lastImportAt: Date | null;
 };
 
 export type StockHeader = {
@@ -15,6 +33,8 @@ export type StockHeader = {
   latestImportId: string | null;
   warningCount: number;
   sectionsAvailable: string[];
+  currentPrice: string | null;
+  marketCap: string | null;
 };
 
 export type MetricPoint = {
@@ -30,4 +50,3 @@ export type StockTimeSeries = {
   cashBalance: MetricPoint[];
   patAndCfo: Array<{ date: string; pat: number | null; cfo: number | null }>;
 };
-

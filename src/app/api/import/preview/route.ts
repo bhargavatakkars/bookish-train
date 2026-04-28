@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { asScreenerImportError, ScreenerImportError } from "@/lib/importer/errors";
-import { normalizeParsedSections } from "@/lib/importer/normalize";
+import {
+  extractImportMetaSnapshot,
+  normalizeParsedSections,
+} from "@/lib/importer/normalize";
 import { buildPreview } from "@/lib/importer/persist";
 import { parseScreenerDataSheetXlsx } from "@/lib/importer/screenerDataSheetParser";
 
@@ -48,9 +51,10 @@ export async function POST(request: Request) {
     const buffer = await file.arrayBuffer();
     const parsed = parseScreenerDataSheetXlsx(buffer);
     const normalized = normalizeParsedSections(parsed.parsedSections);
+    const meta = extractImportMetaSnapshot(parsed.parsedSections);
     const preview = buildPreview(parsed, normalized);
 
-    return NextResponse.json({ ok: true, preview });
+    return NextResponse.json({ ok: true, preview: { ...preview, meta } });
   } catch (error) {
     const typed = asScreenerImportError(error);
     return NextResponse.json(
@@ -59,4 +63,3 @@ export async function POST(request: Request) {
     );
   }
 }
-
