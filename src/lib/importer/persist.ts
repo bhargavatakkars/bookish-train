@@ -23,6 +23,8 @@ import type {
   NormalizedStatements,
 } from "./normalize";
 
+type DbTransaction = Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
+
 export type ImportPreview = {
   parserVersion: string;
   importChecksum: string;
@@ -140,7 +142,7 @@ export async function persistImport(params: {
 }
 
 async function insertProfitLossItems(
-  tx: any,
+  tx: DbTransaction,
   params: {
     companyId: string;
     importId: string;
@@ -200,7 +202,7 @@ async function insertProfitLossItems(
 }
 
 async function insertStatementItems(
-  tx: any,
+  tx: DbTransaction,
   params: {
     table: typeof balanceSheetItems | typeof cashFlowItems;
     companyId: string;

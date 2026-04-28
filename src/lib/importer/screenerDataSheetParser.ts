@@ -1,8 +1,8 @@
 import "server-only";
 
 import crypto from "node:crypto";
-import type { WorkSheet, WorkBook } from "xlsx";
-import * as XLSX from "xlsx";
+import type { WorkSheet, WorkBook } from "xlsx-js-style";
+import * as XLSX from "xlsx-js-style";
 
 import { ScreenerImportError } from "./errors";
 
@@ -272,4 +272,3 @@ export function parseScreenerDataSheetXlsx(buffer: ArrayBuffer): ParsedDataSheet
     importChecksum,
   };
 }
-
