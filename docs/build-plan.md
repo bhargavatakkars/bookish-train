@@ -17,6 +17,7 @@ This file tracks progress, blockers, and next actions. Update **before and after
 
 ## Phase 2 — Metrics + Scoring + Missing Data Intelligence
 
+- [ ] Generate Drizzle migrations for schema changes
 - [ ] Deterministic metrics engine (CAGR, ratios, coverage reasons)
 - [ ] Quality scoring framework (section scores + confidence)
 - [ ] Missing-data panel (present vs missing + suggested free sources)
