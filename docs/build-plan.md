@@ -43,10 +43,9 @@ This file tracks progress, blockers, and next actions. Update **before and after
 
 ## Blockers / Notes
 
-- None yet.
+- Implementing: Phase 1 import pipeline (parser + preview).
 
 ## Assumptions
 
 - Use Drizzle + Postgres as primary persistence.
 - Imports are server-side processed via Route Handlers.
-
