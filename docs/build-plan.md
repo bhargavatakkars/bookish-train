@@ -8,10 +8,10 @@ This file tracks progress, blockers, and next actions. Update **before and after
 - [x] Ensure builds work without external Google Font fetches
 - [ ] Add mandatory documentation set (this, architecture, parser spec, source connectors)
 - [ ] Add PostgreSQL + Drizzle ORM schema + migrations
-- [ ] Implement Screener XLSX parsing (ONLY `Data Sheet`) using SheetJS
+- [x] Implement Screener XLSX parsing (ONLY `Data Sheet`) using SheetJS
 - [ ] Normalize parsed sections into typed statement tables
-- [ ] Persist raw import payload + normalized tables + parser logs
-- [ ] Build import UX: upload -> parse preview -> commit
+- [x] Persist raw import payload + normalized tables + parser logs
+- [x] Build import UX: upload -> parse preview -> commit
 - [ ] Build initial `/stocks/[symbol]` dashboard (coverage + trends)
 
 ## Phase 2 — Metrics + Scoring + Missing Data Intelligence
@@ -43,7 +43,7 @@ This file tracks progress, blockers, and next actions. Update **before and after
 
 ## Blockers / Notes
 
-- Implementing: Phase 1 import pipeline (parser + preview).
+- Milestone done: parser + preview/commit routes. Next: dashboard.
 
 ## Assumptions
 

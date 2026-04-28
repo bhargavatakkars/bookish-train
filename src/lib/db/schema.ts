@@ -36,6 +36,7 @@ export const imports = pgTable("imports", {
 });
 
 export const importRawPayloads = pgTable("import_raw_payloads", {
+  id: uuid("id").defaultRandom().primaryKey(),
   importId: uuid("import_id")
     .notNull()
     .references(() => imports.id, { onDelete: "cascade" }),
@@ -127,4 +128,3 @@ export const parserLogs = pgTable("parser_logs", {
   details: jsonb("details"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
-

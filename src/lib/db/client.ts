@@ -11,18 +11,20 @@ const globalForDb = globalThis as unknown as {
 
 const connectionString = process.env.DATABASE_URL;
 
-if (!connectionString) {
-  throw new Error("DATABASE_URL is not set");
+export function getDb() {
+  if (!connectionString) {
+    throw new Error("DATABASE_URL is not set");
+  }
+
+  const sql =
+    globalForDb.__postgres ??
+    postgres(connectionString, {
+      max: 5,
+      prepare: false,
+    });
+
+  if (process.env.NODE_ENV !== "production") globalForDb.__postgres = sql;
+
+  return drizzle(sql, { schema });
 }
-
-export const sql =
-  globalForDb.__postgres ??
-  postgres(connectionString, {
-    max: 5,
-    prepare: false,
-  });
-
-if (process.env.NODE_ENV !== "production") globalForDb.__postgres = sql;
-
-export const db = drizzle(sql, { schema });
 
