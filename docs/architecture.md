@@ -41,3 +41,9 @@
 - Route Handlers run in serverless/edge contexts; keep parsing server-side, but avoid huge memory spikes.
 - Use Postgres hosted externally (e.g., Neon/Supabase/managed Postgres).
 - Store large raw XLSX binary payloads only if needed; prefer storing extracted `Data Sheet` matrix + workbook metadata.
+
+## Migrations (Drizzle)
+
+- Generate migrations: `npm run db:generate` (writes to `./drizzle`).
+- Apply migrations (local/deploy): `npm run db:migrate` with `DATABASE_URL` set.
+- Commit `./drizzle/*` to source control so Vercel deploys can run the same migration set.

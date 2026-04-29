@@ -8,7 +8,7 @@ This file tracks progress, blockers, and next actions. Update **before and after
 - [x] Ensure builds work without external Google Font fetches
 - [x] Add mandatory documentation set (this, architecture, parser spec, source connectors)
 - [x] Add PostgreSQL + Drizzle ORM schema
-- [ ] Generate + commit Drizzle migrations
+- [x] Generate + commit Drizzle migrations
 - [x] Implement Screener XLSX parsing (ONLY `Data Sheet`) using SheetJS
 - [x] Normalize parsed sections into typed statement tables
 - [x] Persist raw import payload + normalized tables + parser logs
@@ -18,7 +18,7 @@ This file tracks progress, blockers, and next actions. Update **before and after
 
 ## Phase 2 — Metrics + Scoring + Missing Data Intelligence
 
-- [ ] Generate + commit initial Drizzle migrations
+- [x] Generate + commit initial Drizzle migrations
 - [x] Deterministic metrics engine (CAGR, ratios, coverage reasons) (imported-only)
 - [x] Quality scoring framework (section scores + confidence) (imported-only)
 - [x] Missing-data panel (present vs missing + suggested free sources) (imported-only)
