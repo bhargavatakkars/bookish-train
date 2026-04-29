@@ -50,3 +50,29 @@ export type StockTimeSeries = {
   cashBalance: MetricPoint[];
   patAndCfo: Array<{ date: string; pat: number | null; cfo: number | null }>;
 };
+
+export type StockCoverageSummary = {
+  availableMetricKeys: string[];
+  missingMetricKeys: string[];
+  pointsByMetricKey: Record<string, { total: number; nonNull: number }>;
+};
+
+export type StockComputedMetric = {
+  key: string;
+  label: string;
+  value: number | null;
+  unit?: string;
+  reasons: Array<{ code: string; message: string }>;
+};
+
+export type StockQualityScorecard = {
+  importedDataQualityScore: number;
+  confidence: "low" | "medium" | "high";
+  reasons: Array<{ code: string; message: string }>;
+};
+
+export type StockImportedMetricsSnapshot = {
+  coverage: StockCoverageSummary;
+  metrics: StockComputedMetric[];
+  scorecards: StockQualityScorecard;
+};

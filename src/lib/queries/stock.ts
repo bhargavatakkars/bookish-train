@@ -14,7 +14,14 @@ import {
   profitLossItems,
 } from "@/lib/db/schema";
 
-import type { MetricPoint, StockHeader, StockTimeSeries } from "./types";
+import { computeImportedMetrics } from "@/lib/metrics/importedMetrics";
+
+import type {
+  MetricPoint,
+  StockHeader,
+  StockImportedMetricsSnapshot,
+  StockTimeSeries,
+} from "./types";
 
 function toNumberOrNull(value: string | null): number | null {
   if (value === null) return null;
@@ -203,5 +210,57 @@ export async function getStockTimeSeries(
     cfo,
     cashBalance,
     patAndCfo,
+  };
+}
+
+export async function getImportedMetricsSnapshot(params: {
+  header: StockHeader;
+  series: StockTimeSeries;
+}): Promise<StockImportedMetricsSnapshot> {
+  void params.header;
+  const availableMetricKeys = [
+    "sales",
+    "net_profit",
+    "borrowings",
+    "cash_from_operating_activity",
+    "cash_equivalents",
+  ];
+
+  const snapshot = computeImportedMetrics({
+    availableMetricKeys: availableMetricKeys.filter((k) => {
+      if (k === "sales") return params.series.sales.length > 0;
+      if (k === "net_profit") return params.series.netProfit.length > 0;
+      if (k === "borrowings") return params.series.borrowings.length > 0;
+      if (k === "cash_from_operating_activity") return params.series.cfo.length > 0;
+      if (k === "cash_equivalents") return params.series.cashBalance.length > 0;
+      return false;
+    }),
+    seriesByMetricKey: {
+      sales: params.series.sales,
+      net_profit: params.series.netProfit,
+      borrowings: params.series.borrowings,
+      cash_from_operating_activity: params.series.cfo,
+      cash_equivalents: params.series.cashBalance,
+    } as Record<string, MetricPoint[]>,
+    patAndCfo: params.series.patAndCfo,
+  });
+
+  return {
+    coverage: snapshot.coverage,
+    metrics: snapshot.metrics.map((m) => ({
+      key: m.key,
+      label: m.label,
+      value: m.value,
+      unit: m.unit,
+      reasons: m.reasons.map((r) => ({ code: r.code, message: r.message })),
+    })),
+    scorecards: {
+      importedDataQualityScore: snapshot.scorecards.importedDataQualityScore,
+      confidence: snapshot.scorecards.confidence,
+      reasons: snapshot.scorecards.reasons.map((r) => ({
+        code: r.code,
+        message: r.message,
+      })),
+    },
   };
 }

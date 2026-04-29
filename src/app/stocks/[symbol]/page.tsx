@@ -5,6 +5,7 @@ import { SummaryCard } from "@/components/SummaryCard";
 import { StockTrendChart } from "@/components/StockTrendChart";
 import {
   getAnnualPriceSeries,
+  getImportedMetricsSnapshot,
   getParserWarnings,
   getStockHeaderBySymbol,
   getStockTimeSeries,
@@ -17,6 +18,16 @@ function formatValue(value: number | null): string {
 
 function formatTextValue(value: string | null): string {
   return value ?? "Not available from import";
+}
+
+function formatPercent(value: number | null): string {
+  if (value === null) return "Not available from import";
+  return `${value.toFixed(1)}%`;
+}
+
+function formatRatio(value: number | null): string {
+  if (value === null) return "Not available from import";
+  return value.toFixed(2);
 }
 
 function lastNonNull(series: Array<{ value: number | null }>): number | null {
@@ -39,6 +50,8 @@ export default async function StockPage(props: {
     getStockTimeSeries(header.companyId),
     header.latestImportId ? getAnnualPriceSeries(header.latestImportId) : [],
   ]);
+
+  const importedSnapshot = await getImportedMetricsSnapshot({ header, series });
 
   const latestSales = lastNonNull(series.sales);
   const latestNetProfit = lastNonNull(series.netProfit);
@@ -133,6 +146,31 @@ export default async function StockPage(props: {
 
         <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
           <div className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+            Quality scorecards
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+            <div className="text-zinc-500">Imported data score</div>
+            <div className="font-semibold text-zinc-800 dark:text-zinc-200">
+              {importedSnapshot.scorecards.importedDataQualityScore}/100
+            </div>
+            <div className="text-zinc-500">Confidence</div>
+            <div className="text-zinc-800 dark:text-zinc-200">
+              {importedSnapshot.scorecards.confidence}
+            </div>
+          </div>
+          {importedSnapshot.scorecards.reasons.length === 0 ? (
+            <div className="mt-3 text-sm text-zinc-500">No quality warnings</div>
+          ) : (
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-zinc-600 dark:text-zinc-400">
+              {importedSnapshot.scorecards.reasons.slice(0, 5).map((r) => (
+                <li key={r.code}>{r.message}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+          <div className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
             Parser Activity
           </div>
           {warnings.length === 0 ? (
@@ -144,6 +182,76 @@ export default async function StockPage(props: {
               ))}
             </ul>
           )}
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+          <div className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+            Imported metrics
+          </div>
+          <div className="mt-3 grid gap-2 text-sm">
+            {importedSnapshot.metrics.map((m) => (
+              <div
+                key={m.key}
+                className="grid grid-cols-2 gap-2 rounded-md border border-zinc-100 p-2 dark:border-zinc-900"
+              >
+                <div className="text-zinc-600 dark:text-zinc-400">{m.label}</div>
+                <div className="text-right font-semibold text-zinc-800 dark:text-zinc-200">
+                  {m.unit === "%"
+                    ? formatPercent(m.value)
+                    : m.key === "cfo_to_pat"
+                      ? formatRatio(m.value)
+                      : formatRatio(m.value)}
+                </div>
+                {m.value === null && m.reasons.length > 0 ? (
+                  <div className="col-span-2 text-xs text-zinc-500">
+                    {m.reasons[0]!.message}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 text-xs text-zinc-500">
+            Computed from imported statements only.
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+          <div className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+            Present vs missing
+          </div>
+          <div className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
+            Imported-only check for time-series metrics required for basic scoring.
+          </div>
+          <div className="mt-3 grid gap-2 text-sm">
+            {Object.entries(importedSnapshot.coverage.pointsByMetricKey).map(
+              ([key, counts]) => {
+                const missing = importedSnapshot.coverage.missingMetricKeys.includes(key);
+                return (
+                  <div key={key} className="flex items-center justify-between">
+                    <div className="font-mono text-xs text-zinc-700 dark:text-zinc-300">
+                      {key}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`rounded-full px-2 py-1 text-xs font-medium ${
+                          missing
+                            ? "bg-rose-100 text-rose-800"
+                            : "bg-emerald-100 text-emerald-800"
+                        }`}
+                      >
+                        {missing ? "missing" : "present"}
+                      </span>
+                      <span className="text-xs text-zinc-500">
+                        {counts.nonNull}/{counts.total}
+                      </span>
+                    </div>
+                  </div>
+                );
+              },
+            )}
+          </div>
         </div>
       </div>
 
