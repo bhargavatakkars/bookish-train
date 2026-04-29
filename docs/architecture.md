@@ -11,10 +11,10 @@
 
 ## High-Level Data Flow
 
-1. **Upload** (client) → `POST /api/imports/parse` (server)
+1. **Upload** (client) → `POST /api/import/preview` (server)
 2. **Parse** XLSX → extract raw `Data Sheet` matrix + sectioned parse output
 3. **Preview** parse results client-side
-4. **Commit** → `POST /api/imports/commit` (server)
+4. **Commit** → `POST /api/import/commit` (server)
 5. **Persist**
    - raw import payload (metadata + matrix)
    - parser logs/warnings
@@ -41,4 +41,3 @@
 - Route Handlers run in serverless/edge contexts; keep parsing server-side, but avoid huge memory spikes.
 - Use Postgres hosted externally (e.g., Neon/Supabase/managed Postgres).
 - Store large raw XLSX binary payloads only if needed; prefer storing extracted `Data Sheet` matrix + workbook metadata.
-

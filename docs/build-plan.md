@@ -6,10 +6,11 @@ This file tracks progress, blockers, and next actions. Update **before and after
 
 - [x] Scaffold Next.js App Router + Tailwind + baseline lint/build
 - [x] Ensure builds work without external Google Font fetches
-- [ ] Add mandatory documentation set (this, architecture, parser spec, source connectors)
-- [ ] Add PostgreSQL + Drizzle ORM schema + migrations
+- [x] Add mandatory documentation set (this, architecture, parser spec, source connectors)
+- [x] Add PostgreSQL + Drizzle ORM schema
+- [ ] Generate + commit Drizzle migrations
 - [x] Implement Screener XLSX parsing (ONLY `Data Sheet`) using SheetJS
-- [ ] Normalize parsed sections into typed statement tables
+- [x] Normalize parsed sections into typed statement tables
 - [x] Persist raw import payload + normalized tables + parser logs
 - [x] Build import UX: upload -> parse preview -> commit
 - [x] Build DB-backed dashboard (`/`) + `/stocks/[symbol]` detail (coverage + trends)
@@ -17,7 +18,7 @@ This file tracks progress, blockers, and next actions. Update **before and after
 
 ## Phase 2 — Metrics + Scoring + Missing Data Intelligence
 
-- [ ] Generate Drizzle migrations for schema changes
+- [ ] Generate + commit initial Drizzle migrations
 - [ ] Deterministic metrics engine (CAGR, ratios, coverage reasons)
 - [ ] Quality scoring framework (section scores + confidence)
 - [ ] Missing-data panel (present vs missing + suggested free sources)
@@ -48,6 +49,7 @@ This file tracks progress, blockers, and next actions. Update **before and after
 - Dashboard now reads from DB and links to `/stocks/[symbol]`.
 - Detail pages currently map a small set of metric keys (sales, net_profit, borrowings, cash_from_operating_activity, cash_equivalents).
 - META/DERIVED values are stored on `companies`/`imports`; annual PRICE points are stored in `import_annual_prices`.
+- `npm run build` disables Next.js telemetry via `NEXT_TELEMETRY_DISABLED=1`.
 
 ## Assumptions
 
