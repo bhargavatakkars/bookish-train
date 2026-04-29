@@ -218,30 +218,33 @@ export async function getImportedMetricsSnapshot(params: {
   series: StockTimeSeries;
 }): Promise<StockImportedMetricsSnapshot> {
   void params.header;
-  const availableMetricKeys = [
+  const candidateKeys = [
     "sales",
     "net_profit",
     "borrowings",
     "cash_from_operating_activity",
     "cash_equivalents",
+    "net_worth",
+    "ebit",
+    "interest",
+    "dividends",
   ];
 
+  const seriesByMetricKey = {
+    sales: params.series.sales,
+    net_profit: params.series.netProfit,
+    borrowings: params.series.borrowings,
+    cash_from_operating_activity: params.series.cfo,
+    cash_equivalents: params.series.cashBalance,
+    net_worth: [] as MetricPoint[],
+    ebit: [] as MetricPoint[],
+    interest: [] as MetricPoint[],
+    dividends: [] as MetricPoint[],
+  } satisfies Record<string, MetricPoint[]>;
+
   const snapshot = computeImportedMetrics({
-    availableMetricKeys: availableMetricKeys.filter((k) => {
-      if (k === "sales") return params.series.sales.length > 0;
-      if (k === "net_profit") return params.series.netProfit.length > 0;
-      if (k === "borrowings") return params.series.borrowings.length > 0;
-      if (k === "cash_from_operating_activity") return params.series.cfo.length > 0;
-      if (k === "cash_equivalents") return params.series.cashBalance.length > 0;
-      return false;
-    }),
-    seriesByMetricKey: {
-      sales: params.series.sales,
-      net_profit: params.series.netProfit,
-      borrowings: params.series.borrowings,
-      cash_from_operating_activity: params.series.cfo,
-      cash_equivalents: params.series.cashBalance,
-    } as Record<string, MetricPoint[]>,
+    availableMetricKeys: candidateKeys.filter((k) => (seriesByMetricKey[k] ?? []).length > 0),
+    seriesByMetricKey,
     patAndCfo: params.series.patAndCfo,
   });
 
@@ -252,7 +255,9 @@ export async function getImportedMetricsSnapshot(params: {
       label: m.label,
       value: m.value,
       unit: m.unit,
+      status: m.status,
       reasons: m.reasons.map((r) => ({ code: r.code, message: r.message })),
+      note: m.note,
     })),
     scorecards: {
       importedDataQualityScore: snapshot.scorecards.importedDataQualityScore,
@@ -261,6 +266,7 @@ export async function getImportedMetricsSnapshot(params: {
         code: r.code,
         message: r.message,
       })),
+      dimensions: snapshot.scorecards.dimensions,
     },
   };
 }

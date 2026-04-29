@@ -22,6 +22,7 @@ This file tracks progress, blockers, and next actions. Update **before and after
 - [x] Deterministic metrics engine (CAGR, ratios, coverage reasons) (imported-only)
 - [x] Quality scoring framework (section scores + confidence) (imported-only)
 - [x] Missing-data panel (present vs missing + suggested free sources) (imported-only)
+- [ ] Expand imported-only analytics (Milestone 2 in progress)
 - [ ] Trend charts (Recharts or ECharts)
 
 ## Phase 3 — Ownership + Governance Enrichment Connectors

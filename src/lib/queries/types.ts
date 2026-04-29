@@ -62,13 +62,23 @@ export type StockComputedMetric = {
   label: string;
   value: number | null;
   unit?: string;
+  status: "ok" | "unavailable";
   reasons: Array<{ code: string; message: string }>;
+  note?: string;
 };
 
 export type StockQualityScorecard = {
   importedDataQualityScore: number;
   confidence: "low" | "medium" | "high";
   reasons: Array<{ code: string; message: string }>;
+  dimensions: Array<{
+    key: "profitability" | "growth" | "balance_sheet" | "cash_flow" | "data_completeness";
+    label: string;
+    score10: number;
+    badge: "Strong" | "Average" | "Weak";
+    explanation: string;
+    note?: string;
+  }>;
 };
 
 export type StockImportedMetricsSnapshot = {
