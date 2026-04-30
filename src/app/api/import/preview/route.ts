@@ -43,12 +43,16 @@ export async function POST(request: Request) {
       );
     }
 
+    // More permissive check: if MIME type is provided and looks like Excel, accept it
+    // If MIME type is empty or unknown, we'll still try to parse the file
     if (file.type && !isValidXlsxMime(file.type)) {
-      throw new ScreenerImportError(
-        "INVALID_FILE_TYPE",
-        `Invalid file type: ${file.type}`,
-        { status: 415 },
-      );
+      console.warn(`Warning: Unexpected MIME type "${file.type}" for file "${file.name}". Attempting to parse anyway.`);
+      // Don't throw error - let the parser handle invalid files
+      // throw new ScreenerImportError(
+      //   "INVALID_FILE_TYPE",
+      //   `Invalid file type: ${file.type}`,
+      //   { status: 415 },
+      // );
     }
 
     const buffer = await file.arrayBuffer();
