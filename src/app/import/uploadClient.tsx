@@ -31,10 +31,14 @@ type ImportPreview = {
 };
 
 function isValidXlsxMime(type: string): boolean {
-  return (
-    type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
-    type === "application/octet-stream"
-  );
+  // Accept common XLSX MIME types
+  const validTypes = [
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/octet-stream",
+    "application/vnd.ms-excel",
+    "application/xlsx"
+  ];
+  return validTypes.includes(type);
 }
 
 export default function UploadClient() {

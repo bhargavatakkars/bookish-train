@@ -13,11 +13,14 @@ export const runtime = "nodejs";
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 function isValidXlsxMime(type: string): boolean {
-  return (
-    type ===
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
-    type === "application/octet-stream"
-  );
+  // Accept common XLSX MIME types
+  const validTypes = [
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/octet-stream",
+    "application/vnd.ms-excel",
+    "application/xlsx"
+  ];
+  return validTypes.includes(type);
 }
 
 export async function POST(request: Request) {
