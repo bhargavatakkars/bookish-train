@@ -30,6 +30,13 @@ type ImportPreview = {
   };
 };
 
+function isValidXlsxMime(type: string): boolean {
+  return (
+    type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+    type === "application/octet-stream"
+  );
+}
+
 export default function UploadClient() {
   const [file, setFile] = useState<File | null>(null);
   const [symbol, setSymbol] = useState<string>("");
@@ -46,8 +53,36 @@ export default function UploadClient() {
     return preview.warnings.map((w) => `${w.code}: ${w.message}`).join("\n");
   }, [preview]);
 
+  function validateFile(file: File): ApiError | null {
+    // Check file extension
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+      return { code: "INVALID_FILE_TYPE", message: "File must be an XLSX file (.xlsx extension)" };
+    }
+    
+    // Check MIME type
+    if (file.type && !isValidXlsxMime(file.type)) {
+      return { code: "INVALID_FILE_TYPE", message: `Invalid file type: ${file.type}. Expected XLSX.` };
+    }
+    
+    // Check file size (10MB limit)
+    const MAX_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      return { code: "FILE_TOO_LARGE", message: `File too large (${(file.size / 1024 / 1024).toFixed(2)}MB). Max 10MB.` };
+    }
+    
+    return null;
+  }
+
   async function runPreview() {
     if (!file) return;
+    
+    // Validate file before upload
+    const validationError = validateFile(file);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    
     setError(null);
     setImportId(null);
     setPreview(null);
@@ -80,8 +115,24 @@ export default function UploadClient() {
     }
   }
 
+  // Handle successful commit with redirect
+  async function handleCommitSuccess(importId: string, symbol: string) {
+    setImportId(importId);
+    // Short delay to show success state before redirect
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    window.location.href = `/stocks/${encodeURIComponent(symbol)}`;
+  }
+
   async function runCommit() {
     if (!file) return;
+    
+    // Validate file before upload
+    const validationError = validateFile(file);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    
     setError(null);
     setImportId(null);
     setLoading("commit");
@@ -106,7 +157,8 @@ export default function UploadClient() {
         return;
       }
 
-      setImportId(json.importId);
+      // Handle success with redirect
+      await handleCommitSuccess(json.importId, symbol.trim());
     } catch (e) {
       setError({ code: "NETWORK", message: String(e) });
     } finally {
@@ -223,7 +275,11 @@ export default function UploadClient() {
         </button>
         {importId ? (
           <div className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-700">
-            Import saved: <span className="font-mono text-xs">{importId}</span>
+            <div className="font-medium">Import successful!</div>
+            <div className="mt-1">Import ID: <span className="font-mono text-xs">{importId}</span></div>
+            <div className="mt-2">
+              Redirecting to <a href={`/stocks/${encodeURIComponent(symbol.trim())}`} className="underline font-medium">/stocks/{symbol.trim()}</a>...
+            </div>
           </div>
         ) : null}
       </div>
