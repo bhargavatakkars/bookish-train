@@ -1,5 +1,3 @@
-import "server-only";
-
 import type { MetricPoint } from "@/lib/queries/types";
 
 export type CoverageReasonCode =
@@ -50,6 +48,14 @@ export type ImportedMetricsSnapshot = {
       note?: string;
     }>;
   };
+  overallScore?: number; // 0-100 aggregate weighted score
+  // Simple per‑category coverage counts (optional, used by UI if needed)
+  coverageCounts?: Array<{ category: string; total: number; nonNull: number }>;
+  // Quarterly series for UI consumption (bar chart, etc.)
+  quarterlySeries?: {
+    sales: MetricPoint[];
+    netProfit: MetricPoint[];
+  };
 };
 
 function isFiniteNumber(value: unknown): value is number {
@@ -74,76 +80,10 @@ function lastNonNull(points: MetricPoint[]): { date: string; value: number } | n
   return null;
 }
 
-function firstNonNull(points: MetricPoint[]): { date: string; value: number } | null {
-  for (const point of points) {
-    if (isFiniteNumber(point.value)) return { date: point.date, value: point.value };
-  }
-  return null;
-}
 
-function computeCagrFromSeries(points: MetricPoint[]): ImportedMetricResult {
-  const sorted = sortPointsAsc(points);
-  const start = firstNonNull(sorted);
-  const end = lastNonNull(sorted);
-  const reasons: CoverageReason[] = [];
-
-  if (!start || !end) {
-    reasons.push({
-      code: "NOT_ENOUGH_NON_NULL_POINTS",
-      message: "Not enough non-null points to compute CAGR",
-    });
-    return {
-      key: "sales_cagr",
-      label: "Sales CAGR",
-      value: null,
-      unit: "%",
-      status: "unavailable",
-      reasons,
-    };
-  }
-
-  if (start.date === end.date) {
-    reasons.push({
-      code: "NOT_ENOUGH_POINTS",
-      message: "Need at least two distinct periods to compute CAGR",
-    });
-    return {
-      key: "sales_cagr",
-      label: "Sales CAGR",
-      value: null,
-      unit: "%",
-      status: "unavailable",
-      reasons,
-    };
-  }
-
-  if (start.value <= 0 || end.value <= 0) {
-    reasons.push({
-      code: "NOT_ENOUGH_NON_NULL_POINTS",
-      message: "CAGR requires positive start/end values",
-      details: { start: start.value, end: end.value },
-    });
-    return {
-      key: "sales_cagr",
-      label: "Sales CAGR",
-      value: null,
-      unit: "%",
-      status: "unavailable",
-      reasons,
-    };
-  }
-
-  const years = Math.max(1, sorted.length - 1);
-  const cagr = Math.pow(end.value / start.value, 1 / years) - 1;
-  return {
-    key: "sales_cagr",
-    label: "Sales CAGR",
-    value: Number.isFinite(cagr) ? cagr * 100 : null,
-    unit: "%",
-    status: Number.isFinite(cagr) ? "ok" : "unavailable",
-    reasons,
-  };
-}
+// computeCagrFromSeries was previously used for a generic CAGR calculation but
+// the Milestone 2 implementation now uses computeCagrWindow for specific windows.
+// The function is retained for reference but removed to avoid unused‑code warnings.
 
 function computeCagrWindow(params: {
   key: string;
@@ -394,54 +334,6 @@ function computeInterestCoverage(params: {
   };
 }
 
-function computeDividendPayoutProxy(params: {
-  dividends: MetricPoint[];
-  netProfit: MetricPoint[];
-}): ImportedMetricResult {
-  const dividends = lastNonNull(sortPointsAsc(params.dividends));
-  const profit = lastNonNull(sortPointsAsc(params.netProfit));
-  const reasons: CoverageReason[] = [];
-
-  if (!dividends || !profit) {
-    reasons.push({
-      code: "MISSING_REQUIRED_METRICS",
-      message: "Missing dividends or net profit for dividend payout proxy",
-    });
-    return {
-      key: "dividend_payout_proxy",
-      label: "Dividend payout proxy (latest)",
-      value: null,
-      unit: "%",
-      status: "unavailable",
-      reasons,
-    };
-  }
-  if (profit.value === 0) {
-    reasons.push({
-      code: "MISSING_REQUIRED_METRICS",
-      message: "Net profit is zero; cannot compute dividend payout proxy",
-    });
-    return {
-      key: "dividend_payout_proxy",
-      label: "Dividend payout proxy (latest)",
-      value: null,
-      unit: "%",
-      status: "unavailable",
-      reasons,
-    };
-  }
-
-  return {
-    key: "dividend_payout_proxy",
-    label: "Dividend payout proxy (latest)",
-    value: (dividends.value / profit.value) * 100,
-    unit: "%",
-    status: "ok",
-    reasons,
-    note: profit.date,
-  };
-}
-
 function computeCoverageCounts(params: {
   seriesByMetricKey: Record<string, MetricPoint[]>;
 }): ImportedMetricResult[] {
@@ -682,3 +574,439 @@ export function computeImportedMetrics(params: {
     },
   };
 }
+
+  // ---------------------------------------------------------------------------
+  // Dividend payout proxy helper
+  // ---------------------------------------------------------------------------
+  /**
+   * Approximate dividend payout ratio using the latest dividend amount and the
+   * latest net profit. The proxy is defined as dividends / net profit. If either
+   * value is missing or net profit is zero the metric is marked unavailable.
+   */
+  function computeDividendPayoutProxy(params: {
+    dividends: MetricPoint[];
+    netProfit: MetricPoint[];
+  }): ImportedMetricResult {
+    const lastDiv = lastNonNull(sortPointsAsc(params.dividends));
+    const lastProfit = lastNonNull(sortPointsAsc(params.netProfit));
+    const reasons: CoverageReason[] = [];
+
+    if (!lastDiv || !lastProfit) {
+      reasons.push({
+        code: "MISSING_REQUIRED_METRICS",
+        message: "Missing dividend or net profit data for dividend payout proxy",
+      });
+      return {
+        key: "dividend_payout_proxy",
+        label: "Dividend payout proxy (latest)",
+        value: null,
+        status: "unavailable",
+        reasons,
+      };
+    }
+
+    if (lastProfit.value === 0) {
+      reasons.push({
+        code: "MISSING_REQUIRED_METRICS",
+        message: "Net profit is zero – cannot compute dividend payout proxy",
+      });
+      return {
+        key: "dividend_payout_proxy",
+        label: "Dividend payout proxy (latest)",
+        value: null,
+        status: "unavailable",
+        reasons,
+      };
+    }
+
+    return {
+      key: "dividend_payout_proxy",
+      label: "Dividend payout proxy (latest)",
+      value: lastDiv.value / lastProfit.value,
+      status: "ok",
+      reasons,
+      note: lastDiv.date,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Net‑worth metric helper (latest value)
+  // ---------------------------------------------------------------------------
+  function computeNetWorthMetric(params: { netWorth: MetricPoint[] }): ImportedMetricResult {
+    const last = lastNonNull(sortPointsAsc(params.netWorth));
+    const reasons: CoverageReason[] = [];
+    if (!last) {
+      reasons.push({
+        code: "MISSING_REQUIRED_METRICS",
+        message: "Missing net‑worth data",
+      });
+      return {
+        key: "net_worth",
+        label: "Net worth (latest)",
+        value: null,
+        status: "unavailable",
+        reasons,
+      };
+    }
+    return {
+      key: "net_worth",
+      label: "Net worth (latest)",
+      value: last.value,
+      status: "ok",
+      reasons,
+      note: last.date,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Quarterly growth helpers (QoQ and YoY)
+  // ---------------------------------------------------------------------------
+  function computeQoQGrowth(points: MetricPoint[], metricLabel: string): ImportedMetricResult {
+    const sorted = sortPointsAsc(points).filter((p) => p.value !== null) as Array<{ date: string; value: number }>;
+    const reasons: CoverageReason[] = [];
+
+    if (sorted.length < 2) {
+      reasons.push({
+        code: "NOT_ENOUGH_POINTS",
+        message: "Need at least 2 quarters to compute QoQ growth",
+      });
+      return {
+        key: `${metricLabel}_qoq`,
+        label: `${metricLabel === "sales" ? "Revenue" : "Net Profit"} QoQ growth (latest)`,
+        value: null,
+        unit: "%",
+        status: "unavailable",
+        reasons,
+      };
+    }
+
+    const current = sorted[sorted.length - 1]!;
+    const previous = sorted[sorted.length - 2]!;
+
+    if (previous.value === 0) {
+      reasons.push({
+        code: "NOT_ENOUGH_NON_NULL_POINTS",
+        message: "Previous quarter value is zero; cannot compute QoQ",
+      });
+      return {
+        key: `${metricLabel}_qoq`,
+        label: `${metricLabel === "sales" ? "Revenue" : "Net Profit"} QoQ growth (latest)`,
+        value: null,
+        unit: "%",
+        status: "unavailable",
+        reasons,
+      };
+    }
+
+    const qoq = ((current.value - previous.value) / Math.abs(previous.value)) * 100;
+    return {
+      key: `${metricLabel}_qoq`,
+      label: `${metricLabel === "sales" ? "Revenue" : "Net Profit"} QoQ growth (latest)`,
+      value: Number.isFinite(qoq) ? qoq : null,
+      unit: "%",
+      status: Number.isFinite(qoq) ? "ok" : "unavailable",
+      reasons,
+      note: `${previous.date} → ${current.date}`,
+    };
+  }
+
+  function computeYoYGrowth(points: MetricPoint[], metricLabel: string): ImportedMetricResult {
+    const sorted = sortPointsAsc(points).filter((p) => p.value !== null) as Array<{ date: string; value: number }>;
+    const reasons: CoverageReason[] = [];
+
+    if (sorted.length < 5) {
+      reasons.push({
+        code: "NOT_ENOUGH_POINTS",
+        message: "Need at least 5 quarters (to find same quarter last year) to compute YoY growth",
+      });
+      return {
+        key: `${metricLabel}_yoy`,
+        label: `${metricLabel === "sales" ? "Revenue" : "Net Profit"} YoY growth (latest)`,
+        value: null,
+        unit: "%",
+        status: "unavailable",
+        reasons,
+      };
+    }
+
+    const current = sorted[sorted.length - 1]!;
+    // Find the same quarter from the previous year (4 quarters ago)
+    const previous = sorted[sorted.length - 5]!;
+
+    if (previous.value === 0) {
+      reasons.push({
+        code: "NOT_ENOUGH_NON_NULL_POINTS",
+        message: "Same quarter last year value is zero; cannot compute YoY",
+      });
+      return {
+        key: `${metricLabel}_yoy`,
+        label: `${metricLabel === "sales" ? "Revenue" : "Net Profit"} YoY growth (latest)`,
+        value: null,
+        unit: "%",
+        status: "unavailable",
+        reasons,
+      };
+    }
+
+    const yoy = ((current.value - previous.value) / Math.abs(previous.value)) * 100;
+    return {
+      key: `${metricLabel}_yoy`,
+      label: `${metricLabel === "sales" ? "Revenue" : "Net Profit"} YoY growth (latest)`,
+      value: Number.isFinite(yoy) ? yoy : null,
+      unit: "%",
+      status: Number.isFinite(yoy) ? "ok" : "unavailable",
+      reasons,
+      note: `${previous.date} → ${current.date}`,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Snapshot builder – orchestrates all metric calculations
+  // ---------------------------------------------------------------------------
+  export function buildImportedMetricsSnapshot(params: {
+    series: {
+      sales: MetricPoint[];
+      netProfit: MetricPoint[];
+      borrowings: MetricPoint[];
+      netWorth: MetricPoint[];
+      cfo: MetricPoint[];
+      cashBalance: MetricPoint[];
+      ebit: MetricPoint[];
+      interest: MetricPoint[];
+      dividends: MetricPoint[];
+      quarterlySales?: MetricPoint[];
+      quarterlyNetProfit?: MetricPoint[];
+    };
+    coverage: ImportedCoverageSummary;
+  }): ImportedMetricsSnapshot {
+    const { series, coverage } = params;
+
+    // Compute individual metrics
+    const metrics: ImportedMetricResult[] = [];
+
+    // Revenue CAGR windows
+    metrics.push(
+      computeCagrWindow({
+        key: "revenue_cagr_3y",
+        label: "Revenue CAGR (3Y)",
+        points: series.sales,
+        years: 3 as const,
+      }),
+      computeCagrWindow({
+        key: "revenue_cagr_5y",
+        label: "Revenue CAGR (5Y)",
+        points: series.sales,
+        years: 5 as const,
+      }),
+      computeCagrWindow({
+        key: "revenue_cagr_10y",
+        label: "Revenue CAGR (10Y)",
+        points: series.sales,
+        years: 10 as const,
+      }),
+    );
+
+    // Net profit CAGR windows
+    metrics.push(
+      computeCagrWindow({
+        key: "net_profit_cagr_3y",
+        label: "Net profit CAGR (3Y)",
+        points: series.netProfit,
+        years: 3 as const,
+      }),
+      computeCagrWindow({
+        key: "net_profit_cagr_5y",
+        label: "Net profit CAGR (5Y)",
+        points: series.netProfit,
+        years: 5 as const,
+      }),
+      computeCagrWindow({
+        key: "net_profit_cagr_10y",
+        label: "Net profit CAGR (10Y)",
+        points: series.netProfit,
+        years: 10 as const,
+      }),
+    );
+
+    // Latest net margin
+    metrics.push(computeNetMargin(series.sales, series.netProfit));
+
+    // Debt / Equity
+    metrics.push(computeDebtToEquity({ borrowings: series.borrowings, netWorth: series.netWorth }));
+
+    // Interest coverage
+    metrics.push(computeInterestCoverage({ ebit: series.ebit, interest: series.interest }));
+
+    // CFO / PAT
+    const patAndCfo = series.netProfit.map((p, i) => ({
+      date: p.date,
+      pat: p.value,
+      cfo: series.cfo[i]?.value ?? null,
+    }));
+    metrics.push(computeCfoToPat(patAndCfo));
+
+    // Dividend payout proxy
+    metrics.push(computeDividendPayoutProxy({ dividends: series.dividends, netProfit: series.netProfit }));
+
+    // Net worth metric
+    metrics.push(computeNetWorthMetric({ netWorth: series.netWorth }));
+
+    // Quarterly growth metrics (QoQ and YoY for Revenue and PAT)
+    if (series.quarterlySales && series.quarterlySales.length > 0) {
+      metrics.push(computeQoQGrowth(series.quarterlySales, "sales"));
+      metrics.push(computeYoYGrowth(series.quarterlySales, "sales"));
+    }
+    if (series.quarterlyNetProfit && series.quarterlyNetProfit.length > 0) {
+      metrics.push(computeQoQGrowth(series.quarterlyNetProfit, "net_profit"));
+      metrics.push(computeYoYGrowth(series.quarterlyNetProfit, "net_profit"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Simple data‑completeness scoring per category
+    // -----------------------------------------------------------------------
+    // The original keyToGroup mapping was unused after refactoring. It has been
+    // removed to eliminate the unused‑variable warning.
+    const groupMetrics: Record<string, ImportedMetricResult[]> = {
+      profitability: [],
+      growth: [],
+      balance_sheet: [],
+      cash_flow: [],
+      data_completeness: [],
+    };
+
+    // Populate groups for scoring (profitability, balance_sheet, cash_flow)
+    for (const m of metrics) {
+      if (m.key.includes("cagr")) {
+        groupMetrics.growth.push(m);
+      } else if (m.key === "net_margin") {
+        groupMetrics.profitability.push(m);
+      } else if (m.key === "debt_to_equity" || m.key === "interest_coverage") {
+        groupMetrics.balance_sheet.push(m);
+      } else if (m.key === "cfo_to_pat" || m.key === "dividend_payout_proxy") {
+        groupMetrics.cash_flow.push(m);
+      } else if (m.key === "net_worth") {
+        groupMetrics.balance_sheet.push(m);
+      }
+    }
+
+    // Helper to compute a 0‑10 score based on proportion of ok metrics
+    const computeScore = (arr: ImportedMetricResult[]): { score10: number; badge: "Strong" | "Average" | "Weak" } => {
+      if (arr.length === 0) return { score10: 0, badge: "Weak" as const };
+      const okCount = arr.filter((m) => m.status === "ok").length;
+      const ratio = okCount / arr.length;
+      const score10 = Math.round(ratio * 10);
+      const badge = ratio >= 0.8 ? "Strong" : ratio >= 0.5 ? "Average" : "Weak";
+      return { score10, badge };
+    };
+
+    const dimensions = [
+      {
+        key: "profitability" as const,
+        label: "Profitability",
+        ...computeScore(groupMetrics.profitability),
+        explanation: "Based on net margin and related profitability metrics.",
+      },
+      {
+        key: "growth" as const,
+        label: "Growth",
+        ...computeScore(groupMetrics.growth),
+        explanation: "Based on revenue and net‑profit CAGR metrics.",
+      },
+      {
+        key: "balance_sheet" as const,
+        label: "Balance Sheet",
+        ...computeScore(groupMetrics.balance_sheet),
+        explanation: "Based on debt/equity, interest coverage and net‑worth.",
+      },
+      {
+        key: "cash_flow" as const,
+        label: "Cash Flow",
+        ...computeScore(groupMetrics.cash_flow),
+        explanation: "Based on CFO/PAT and dividend payout proxy.",
+      },
+      {
+        key: "data_completeness" as const,
+        label: "Data Completeness",
+        score10: 0,
+        badge: "Weak" as const,
+        explanation: "Counts of available points per data category.",
+      },
+    ];
+
+    // -----------------------------------------------------------------------
+    // Coverage counts per high‑level category (annual, quarterly, balance‑sheet, cash‑flow, price)
+    // -----------------------------------------------------------------------
+    const categoryMap: Record<string, string[]> = {
+      annual: ["sales", "net_profit", "borrowings", "net_worth", "ebit", "interest", "dividends"],
+      "balance-sheet": ["borrowings", "net_worth", "cash_equivalents", "interest"],
+      "cash-flow": ["cfo", "cash_from_operating_activity", "dividends"],
+      price: ["price"],
+    };
+
+    // Compute quarterly coverage from the series directly
+    const quarterlyTotal = (series.quarterlySales?.length ?? 0) + (series.quarterlyNetProfit?.length ?? 0);
+    const quarterlyNonNull = (series.quarterlySales?.filter((p) => p.value !== null).length ?? 0) +
+      (series.quarterlyNetProfit?.filter((p) => p.value !== null).length ?? 0);
+
+    const coverageCounts = Object.entries(categoryMap).map(([cat, keys]) => {
+      let total = 0;
+      let nonNull = 0;
+      for (const k of keys) {
+        const entry = coverage.pointsByMetricKey[k];
+        if (entry) {
+          total += entry.total;
+          nonNull += entry.nonNull;
+        }
+      }
+      return { category: cat, total, nonNull };
+    });
+
+    // Add quarterly coverage counts
+    coverageCounts.push({ category: "quarterly", total: quarterlyTotal, nonNull: quarterlyNonNull });
+
+    // Compute overall weighted score (0-100)
+    // Weights: Profitability 25%, Growth 25%, Balance Sheet 20%, Cash Flow 20%, Data Completeness 10%
+    const weights = {
+      profitability: 0.25,
+      growth: 0.25,
+      balance_sheet: 0.20,
+      cash_flow: 0.20,
+      data_completeness: 0.10,
+    } as const;
+
+    let weightedSum = 0;
+    let weightUsed = 0;
+    for (const dim of dimensions) {
+      const w = weights[dim.key as keyof typeof weights] ?? 0;
+      if (w > 0 && dim.score10 !== undefined) {
+        weightedSum += (dim.score10 / 10) * w;
+        weightUsed += w;
+      }
+    }
+    const overallScore = weightUsed > 0 ? Math.round((weightedSum / weightUsed) * 100) : 0;
+
+    // Attach simple counts to the dimensions array for UI (optional)
+    // Here we just store them in a dedicated field on the snapshot (not used elsewhere yet)
+    const snapshot: ImportedMetricsSnapshot = {
+      coverage,
+      metrics,
+      scorecards: {
+        importedDataQualityScore: 0, // placeholder – could be aggregated later
+        confidence: "medium",
+        reasons: [],
+        dimensions,
+      },
+      overallScore,
+      // Include quarterly series for UI consumption (bar chart, etc.)
+      quarterlySeries: series.quarterlySales || series.quarterlyNetProfit
+        ? {
+            sales: series.quarterlySales ?? [],
+            netProfit: series.quarterlyNetProfit ?? [],
+          }
+        : undefined,
+    };
+
+    // Attach the optional coverage counts (typed in ImportedMetricsSnapshot)
+    snapshot.coverageCounts = coverageCounts;
+    return snapshot;
+  }

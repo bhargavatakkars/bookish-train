@@ -46,9 +46,12 @@ export type StockTimeSeries = {
   sales: MetricPoint[];
   netProfit: MetricPoint[];
   borrowings: MetricPoint[];
+  netWorth: MetricPoint[];
   cfo: MetricPoint[];
   cashBalance: MetricPoint[];
   patAndCfo: Array<{ date: string; pat: number | null; cfo: number | null }>;
+  quarterlySales: MetricPoint[];
+  quarterlyNetProfit: MetricPoint[];
 };
 
 export type StockCoverageSummary = {
@@ -85,4 +88,10 @@ export type StockImportedMetricsSnapshot = {
   coverage: StockCoverageSummary;
   metrics: StockComputedMetric[];
   scorecards: StockQualityScorecard;
+  overallScore?: number; // 0-100 aggregate score
+  coverageCounts?: Array<{ category: string; total: number; nonNull: number }>;
+  quarterlySeries?: {
+    sales: MetricPoint[];
+    netProfit: MetricPoint[];
+  };
 };

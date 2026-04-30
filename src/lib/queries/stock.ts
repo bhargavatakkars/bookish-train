@@ -14,7 +14,7 @@ import {
   profitLossItems,
 } from "@/lib/db/schema";
 
-import { computeImportedMetrics } from "@/lib/metrics/importedMetrics";
+import { buildImportedMetricsSnapshot } from "@/lib/metrics/importedMetrics";
 
 import type {
   MetricPoint,
@@ -168,7 +168,16 @@ async function getMetricSeries(params: {
 export async function getStockTimeSeries(
   companyId: string,
 ): Promise<StockTimeSeries> {
-  const [sales, netProfit, borrowings, cfo, cashBalance] = await Promise.all([
+  const [
+    sales,
+    netProfit,
+    borrowings,
+    netWorth,
+    cfo,
+    cashBalance,
+    quarterlySales,
+    quarterlyNetProfit,
+  ] = await Promise.all([
     getMetricSeries({
       companyId,
       table: profitLossItems,
@@ -186,8 +195,25 @@ export async function getStockTimeSeries(
       table: balanceSheetItems,
       metricKey: "borrowings",
     }),
+    getMetricSeries({
+      companyId,
+      table: balanceSheetItems,
+      metricKey: "net_worth",
+    }),
     getMetricSeries({ companyId, table: cashFlowItems, metricKey: "cash_from_operating_activity" }),
     getMetricSeries({ companyId, table: balanceSheetItems, metricKey: "cash_equivalents" }),
+    getMetricSeries({
+      companyId,
+      table: profitLossItems,
+      metricKey: "sales",
+      frequency: "quarterly",
+    }),
+    getMetricSeries({
+      companyId,
+      table: profitLossItems,
+      metricKey: "net_profit",
+      frequency: "quarterly",
+    }),
   ]);
 
   const byDate = new Map<string, { pat: number | null; cfo: number | null }>();
@@ -207,9 +233,12 @@ export async function getStockTimeSeries(
     sales,
     netProfit,
     borrowings,
+    netWorth,
     cfo,
     cashBalance,
     patAndCfo,
+    quarterlySales,
+    quarterlyNetProfit,
   };
 }
 
@@ -230,43 +259,49 @@ export async function getImportedMetricsSnapshot(params: {
     "dividends",
   ];
 
-  const seriesByMetricKey = {
+  const seriesByMetricKey: Record<string, MetricPoint[]> = {
     sales: params.series.sales,
     net_profit: params.series.netProfit,
     borrowings: params.series.borrowings,
     cash_from_operating_activity: params.series.cfo,
     cash_equivalents: params.series.cashBalance,
-    net_worth: [] as MetricPoint[],
+    net_worth: params.series.netWorth,
     ebit: [] as MetricPoint[],
     interest: [] as MetricPoint[],
     dividends: [] as MetricPoint[],
-  } satisfies Record<string, MetricPoint[]>;
+  };
 
-  const snapshot = computeImportedMetrics({
-    availableMetricKeys: candidateKeys.filter((k) => (seriesByMetricKey[k] ?? []).length > 0),
-    seriesByMetricKey,
-    patAndCfo: params.series.patAndCfo,
+  // Build the full imported‑metrics snapshot using the new orchestrator
+  const snapshot = buildImportedMetricsSnapshot({
+    series: {
+      sales: seriesByMetricKey.sales,
+      netProfit: seriesByMetricKey.net_profit,
+      borrowings: seriesByMetricKey.borrowings,
+      netWorth: seriesByMetricKey.net_worth,
+      cfo: seriesByMetricKey.cash_from_operating_activity,
+      cashBalance: seriesByMetricKey.cash_equivalents,
+      ebit: seriesByMetricKey.ebit,
+      interest: seriesByMetricKey.interest,
+      dividends: seriesByMetricKey.dividends,
+      quarterlySales: params.series.quarterlySales,
+      quarterlyNetProfit: params.series.quarterlyNetProfit,
+    },
+    coverage: {
+      availableMetricKeys: candidateKeys.filter((k) => (seriesByMetricKey[k] ?? []).length > 0),
+      missingMetricKeys: candidateKeys.filter((k) => !(seriesByMetricKey[k] ?? []).length),
+      pointsByMetricKey: Object.fromEntries(
+        Object.entries(seriesByMetricKey).map(([k, pts]) => [k, { total: pts.length, nonNull: pts.filter((p) => p.value !== null).length }]),
+      ),
+    },
   });
 
   return {
     coverage: snapshot.coverage,
-    metrics: snapshot.metrics.map((m) => ({
-      key: m.key,
-      label: m.label,
-      value: m.value,
-      unit: m.unit,
-      status: m.status,
-      reasons: m.reasons.map((r) => ({ code: r.code, message: r.message })),
-      note: m.note,
-    })),
-    scorecards: {
-      importedDataQualityScore: snapshot.scorecards.importedDataQualityScore,
-      confidence: snapshot.scorecards.confidence,
-      reasons: snapshot.scorecards.reasons.map((r) => ({
-        code: r.code,
-        message: r.message,
-      })),
-      dimensions: snapshot.scorecards.dimensions,
+    metrics: snapshot.metrics,
+    scorecards: snapshot.scorecards,
+    quarterlySeries: {
+      sales: params.series.quarterlySales,
+      netProfit: params.series.quarterlyNetProfit,
     },
   };
 }
